@@ -1,0 +1,128 @@
+import { Suspense, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Sky, Stars } from '@react-three/drei';
+import * as THREE from 'three';
+import { GroundPlane } from './GroundPlane';
+import { SiteBoundary } from './SiteBoundary';
+import { Asset3D } from './Asset3D';
+import { TrailLayer } from './TrailLayer';
+import { HeatmapLayer } from './HeatmapLayer';
+import { usePlayback } from '../stores/playbackStore';
+
+/** Drives the playback clock inside the Canvas RAF */
+function PlaybackClock() {
+  const { playing, tick } = usePlayback();
+
+  useFrame((_, delta) => {
+    if (playing) tick(delta);
+  });
+
+  return null;
+}
+
+/** Repositions camera when siteData changes */
+function CameraRig() {
+  const siteSize = usePlayback(s => s.siteData.site.sizeMeters);
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const h = siteSize * 0.65;
+    const d = siteSize * 0.88;
+    camera.position.set(0, h, d);
+    (camera as THREE.PerspectiveCamera).near = Math.max(1, siteSize / 500);
+    (camera as THREE.PerspectiveCamera).far = siteSize * 20;
+    (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+  }, [camera, siteSize]);
+
+  return null;
+}
+
+/** Keyboard shortcuts */
+function KeyboardShortcuts() {
+  const { playing, setPlaying, reset, setSpeed, speed } = usePlayback();
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (e.code === 'Space') { e.preventDefault(); setPlaying(!playing); }
+      if (e.code === 'KeyR') reset();
+      if (e.code === 'BracketRight') setSpeed(Math.min(speed * 3, 9000));
+      if (e.code === 'BracketLeft')  setSpeed(Math.max(speed / 3, 60));
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [playing, speed, setPlaying, reset, setSpeed]);
+
+  return null;
+}
+
+export function Scene() {
+  const { siteData, mode } = usePlayback();
+  const assets = siteData.assets;
+  const siteSize = siteData.site.sizeMeters;
+
+  const showTrails  = mode === 'trails' || mode === 'both';
+  const showHeatmap = mode === 'heatmap' || mode === 'both';
+
+  const shadowHalf = siteSize * 0.6;
+  const lightPos   = siteSize * 0.7;
+
+  return (
+    <Canvas
+      shadows
+      camera={{ position: [0, siteSize * 0.65, siteSize * 0.88], fov: 50, near: 1, far: siteSize * 20 }}
+      gl={{ antialias: true }}
+      onCreated={({ gl }) => {
+        gl.setClearColor('#1a1f17'); // matches outer boundary ground colour
+        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+      }}
+    >
+      <CameraRig />
+      <KeyboardShortcuts />
+      <PlaybackClock />
+
+      {/* Lighting */}
+      <ambientLight intensity={0.4} color="#c0d8ff" />
+      <directionalLight
+        position={[lightPos, lightPos * 1.5, lightPos * 0.75]}
+        intensity={1.8}
+        color="#fff5e0"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-far={siteSize * 4}
+        shadow-camera-left={-shadowHalf}
+        shadow-camera-right={shadowHalf}
+        shadow-camera-top={shadowHalf}
+        shadow-camera-bottom={-shadowHalf}
+      />
+      <hemisphereLight args={['#294066', '#1a2d10', 0.6]} />
+
+      {/* Sky */}
+      <Sky sunPosition={[80, 30, 60]} turbidity={6} rayleigh={0.5} />
+      <Stars radius={siteSize * 8} depth={siteSize * 2} count={2000} factor={3} fade />
+
+      {/* Scene objects */}
+      <Suspense fallback={null}>
+        <GroundPlane />
+        <SiteBoundary />
+
+        {showHeatmap && <HeatmapLayer assets={assets} />}
+        {showTrails  && <TrailLayer   assets={assets} />}
+
+        {assets.map(asset => (
+          <Asset3D key={asset.id} asset={asset} showLabel={true} />
+        ))}
+      </Suspense>
+
+      {/* Camera */}
+      <OrbitControls
+        target={[0, 0, 0]}
+        minDistance={30}
+        maxDistance={siteSize * 5}
+        maxPolarAngle={Math.PI / 2.05}
+        dampingFactor={0.08}
+        enableDamping
+      />
+    </Canvas>
+  );
+}
