@@ -20,6 +20,19 @@ const STATE_DOT: Record<AssetState, string> = {
   off:     '#475569',
 };
 
+const STATE_ICON: Record<AssetState, string> = {
+  working: '⚙',
+  moving:  '▶',
+  idle:    '◉',
+  off:     '■',
+};
+
+// Bar segments + percent labels iterate these in render order; excludes 'off'
+// since off-site time isn't charted.
+const ON_SITE_STATES: readonly AssetState[] = ['working', 'moving', 'idle'];
+
+const BUCKET_SECONDS = 120;
+
 /** Split "EVAL-RENTAL-01 · Genie S-45" into name + assetType.
  *  Labels without the separator return assetType = null. */
 function splitLabel(label: string): { name: string; assetType: string | null } {
@@ -28,14 +41,11 @@ function splitLabel(label: string): { name: string; assetType: string | null } {
   return { name: label.slice(0, idx), assetType: label.slice(idx + 3) };
 }
 
-// ─── Container ────────────────────────────────────────────────────────────────
-
 export function AssetList() {
   const siteData        = useDatasetStore(s => s.siteData);
   const t               = useClockStore(s => s.t);
   const focusedAssetId  = useUiStore(s => s.focusedAssetId);
   const setFocusedAsset = useUiStore(s => s.setFocusedAsset);
-  const bucket = Math.floor(t / 120); // throttle: recompute stats once per 120s slot
 
   return (
     <div
@@ -47,19 +57,16 @@ export function AssetList() {
         maxHeight: 'calc(100vh - 5rem)',
       }}
     >
-      {/* Header */}
       <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-white/5 shrink-0">
         Assets on site
       </div>
 
-      {/* Scrollable card list */}
       <div className="divide-y divide-white/5 overflow-y-auto">
         {siteData.assets.map(asset => (
           <AssetCard
             key={asset.id}
             asset={asset}
             t={t}
-            bucket={bucket}
             isFocused={focusedAssetId === asset.id}
             onFocus={() => setFocusedAsset(focusedAssetId === asset.id ? null : asset.id)}
           />
@@ -69,33 +76,31 @@ export function AssetList() {
   );
 }
 
-// ─── Per-asset card ────────────────────────────────────────────────────────────
-
 interface AssetCardProps {
   asset: Asset;
   t: number;
-  bucket: number;
   isFocused: boolean;
   onFocus: () => void;
 }
 
-function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
-  // Live pose — runs every frame to keep state badge current
+function AssetCard({ asset, t, isFocused, onFocus }: AssetCardProps) {
+  // Live pose — runs every frame to keep the state badge current
   const pose = interpolatePose(asset.snapshots, t);
   const onSite = pose !== null && pose.state !== 'off';
   const currentState: AssetState = pose?.state ?? 'off';
 
-  // Throttled stats — recompute once per 120s bucket
+  // Throttled stats — bucket-indexed so we recompute once per BUCKET_SECONDS.
+  // Passing bucket-derived seconds (not live `t`) keeps the memo honest.
+  const bucket = Math.floor(t / BUCKET_SECONDS);
   const stats = useMemo(
-    () => computeAssetStats(asset.snapshots, t),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => computeAssetStats(asset.snapshots, bucket * BUCKET_SECONDS),
     [asset.snapshots, bucket],
   );
 
   const { name, assetType } = splitLabel(asset.label);
 
-  const dotColor  = onSite ? STATE_DOT[currentState] : '#1e293b';
-  const dotGlow   = onSite && currentState !== 'off' ? `0 0 6px ${STATE_DOT[currentState]}` : 'none';
+  const dotColor = onSite ? STATE_DOT[currentState] : '#1e293b';
+  const dotGlow  = onSite ? `0 0 6px ${STATE_DOT[currentState]}` : 'none';
 
   const timeLabel =
     stats.phase === 'not_yet'
@@ -109,12 +114,11 @@ function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
       onClick={onFocus}
       className="px-3 py-2.5 transition-all cursor-pointer"
       style={{
-        opacity:       stats.phase === 'not_yet' ? 0.45 : 1,
-        background:    isFocused ? `${asset.color}12` : 'transparent',
-        boxShadow:     isFocused ? `inset 2px 0 0 ${asset.color}` : 'none',
+        opacity:    stats.phase === 'not_yet' ? 0.45 : 1,
+        background: isFocused ? `${asset.color}12` : 'transparent',
+        boxShadow:  isFocused ? `inset 2px 0 0 ${asset.color}` : 'none',
       }}
     >
-      {/* Row 1 — dot + name + state badge */}
       <div className="flex items-center gap-2 mb-0.5">
         <div
           className="w-2 h-2 rounded-full shrink-0"
@@ -138,14 +142,12 @@ function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
         </span>
       </div>
 
-      {/* Row 2 — asset type (only when available) */}
       {assetType && (
         <div className="text-xs ml-4 mb-1" style={{ color: '#64748b' }}>
           {assetType}
         </div>
       )}
 
-      {/* Row 3 — time on site */}
       <div
         className="text-xs ml-4 mb-2"
         style={{ color: stats.phase === 'not_yet' ? '#475569' : '#94a3b8' }}
@@ -156,15 +158,13 @@ function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
         )}
       </div>
 
-      {/* Rows 4-5 — state bar + percentages */}
       {showBar && (
         <>
-          {/* Segmented bar */}
           <div
             className="ml-4 h-1.5 rounded-full overflow-hidden flex"
             style={{ background: '#1e293b', width: 'calc(100% - 1rem)' }}
           >
-            {(['working', 'moving', 'idle'] as const).map(s =>
+            {ON_SITE_STATES.map(s =>
               stats.statePercents[s] > 0 ? (
                 <div
                   key={s}
@@ -178,22 +178,13 @@ function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
             )}
           </div>
 
-          {/* Percentage labels */}
           <div className="flex gap-2.5 mt-1 ml-4">
-            {stats.statePercents.working > 0 && (
-              <span className="text-xs" style={{ color: STATE_DOT.working }}>
-                ⚙ {stats.statePercents.working}%
-              </span>
-            )}
-            {stats.statePercents.moving > 0 && (
-              <span className="text-xs" style={{ color: STATE_DOT.moving }}>
-                ▶ {stats.statePercents.moving}%
-              </span>
-            )}
-            {stats.statePercents.idle > 0 && (
-              <span className="text-xs" style={{ color: STATE_DOT.idle }}>
-                ◉ {stats.statePercents.idle}%
-              </span>
+            {ON_SITE_STATES.map(s =>
+              stats.statePercents[s] > 0 ? (
+                <span key={s} className="text-xs" style={{ color: STATE_DOT[s] }}>
+                  {STATE_ICON[s]} {stats.statePercents[s]}%
+                </span>
+              ) : null,
             )}
           </div>
         </>

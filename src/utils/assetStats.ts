@@ -32,7 +32,6 @@ export function computeAssetStats(snapshots: Snapshot[], t: number): AssetStats 
   const effectiveT = Math.min(t, last.t);
   const totals = emptyRecord();
 
-  // Walk consecutive snapshot pairs, credit a.state for [a.t, min(b.t, effectiveT)]
   for (let i = 0; i < snapshots.length - 1; i++) {
     const a = snapshots[i];
     if (a.t >= effectiveT) break;
