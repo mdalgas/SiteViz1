@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { Line } from '@react-three/drei';
-import * as THREE from 'three';
 import type { Asset } from '../types';
 import { useClockStore } from '../stores/clockStore';
 import { trailPointsUpTo } from '../utils/interpolate';
@@ -22,15 +21,14 @@ export function TrailLayer({ assets }: TrailLayerProps) {
 }
 
 function AssetTrail({ asset, t }: { asset: Asset; t: number }) {
-  const rawPoints = useMemo(
+  const points = useMemo(
     () => trailPointsUpTo(asset.snapshots, t),
     [asset.snapshots, t]
   );
 
-  if (rawPoints.length < 2) return null;
+  if (points.length < 2) return null;
 
-  const points = rawPoints.map(([x, y, z]) => new THREE.Vector3(x, y, z));
-
+  // drei <Line> accepts [x,y,z] tuples directly — no need to wrap in Vector3
   return (
     <Line
       points={points}

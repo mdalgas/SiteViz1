@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useClockStore } from '../stores/clockStore';
+import { useUiStore } from '../stores/uiStore';
 import { interpolatePose } from '../utils/interpolate';
 import { computeAssetStats, formatDuration } from '../utils/assetStats';
 import type { Asset, AssetState } from '../types';
@@ -30,12 +31,15 @@ function splitLabel(label: string): { name: string; assetType: string | null } {
 // ─── Container ────────────────────────────────────────────────────────────────
 
 export function AssetList() {
-  const siteData = useDatasetStore(s => s.siteData);
-  const t        = useClockStore(s => s.t);
+  const siteData        = useDatasetStore(s => s.siteData);
+  const t               = useClockStore(s => s.t);
+  const focusedAssetId  = useUiStore(s => s.focusedAssetId);
+  const setFocusedAsset = useUiStore(s => s.setFocusedAsset);
   const bucket = Math.floor(t / 120); // throttle: recompute stats once per 120s slot
 
   return (
     <div
+      data-asset-list=""
       className="fixed left-3 top-16 z-10 w-64 rounded-xl flex flex-col"
       style={{
         background: 'rgba(8,10,16,0.90)',
@@ -51,7 +55,14 @@ export function AssetList() {
       {/* Scrollable card list */}
       <div className="divide-y divide-white/5 overflow-y-auto">
         {siteData.assets.map(asset => (
-          <AssetCard key={asset.id} asset={asset} t={t} bucket={bucket} />
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            t={t}
+            bucket={bucket}
+            isFocused={focusedAssetId === asset.id}
+            onFocus={() => setFocusedAsset(focusedAssetId === asset.id ? null : asset.id)}
+          />
         ))}
       </div>
     </div>
@@ -64,9 +75,11 @@ interface AssetCardProps {
   asset: Asset;
   t: number;
   bucket: number;
+  isFocused: boolean;
+  onFocus: () => void;
 }
 
-function AssetCard({ asset, t, bucket }: AssetCardProps) {
+function AssetCard({ asset, t, bucket, isFocused, onFocus }: AssetCardProps) {
   // Live pose — runs every frame to keep state badge current
   const pose = interpolatePose(asset.snapshots, t);
   const onSite = pose !== null && pose.state !== 'off';
@@ -93,8 +106,13 @@ function AssetCard({ asset, t, bucket }: AssetCardProps) {
 
   return (
     <div
-      className="px-3 py-2.5 transition-opacity"
-      style={{ opacity: stats.phase === 'not_yet' ? 0.45 : 1 }}
+      onClick={onFocus}
+      className="px-3 py-2.5 transition-all cursor-pointer"
+      style={{
+        opacity:       stats.phase === 'not_yet' ? 0.45 : 1,
+        background:    isFocused ? `${asset.color}12` : 'transparent',
+        boxShadow:     isFocused ? `inset 2px 0 0 ${asset.color}` : 'none',
+      }}
     >
       {/* Row 1 — dot + name + state badge */}
       <div className="flex items-center gap-2 mb-0.5">

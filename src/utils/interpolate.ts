@@ -22,10 +22,16 @@ export function interpolatePose(snapshots: Snapshot[], t: number): InterpolatedP
   const first = snapshots[0];
   const last  = snapshots[snapshots.length - 1];
 
-  if (t <= first.t) {
+  // Asset is off-site before arrival and after departure. Callers that want to
+  // read the first/last pose (e.g. heatmap backfill) should do so explicitly
+  // against snapshots[0]/snapshots[N-1] rather than calling this with an out-
+  // of-range t.
+  if (t < first.t) return null;
+  if (t > last.t) return null;
+  if (t === first.t) {
     return { x: first.x, z: first.z, heading: first.heading, state: first.state, speed: 0 };
   }
-  if (t >= last.t) {
+  if (t === last.t) {
     return { x: last.x, z: last.z, heading: last.heading, state: last.state, speed: 0 };
   }
 

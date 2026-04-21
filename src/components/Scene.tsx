@@ -1,12 +1,14 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GroundPlane } from './GroundPlane';
 import { SiteBoundary } from './SiteBoundary';
 import { Asset3D } from './Asset3D';
 import { TrailLayer } from './TrailLayer';
 import { HeatmapLayer } from './HeatmapLayer';
+import { useFocusController } from '../hooks/useFocusController';
 import { useClockStore } from '../stores/clockStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useUiStore } from '../stores/uiStore';
@@ -15,6 +17,30 @@ import { tickPlayback, resetPlayback } from '../stores/playbackTick';
 /** Drives the playback clock inside the Canvas RAF */
 function PlaybackClock() {
   useFrame((_, delta) => tickPlayback(delta));
+  return null;
+}
+
+/**
+ * Owns the single gl.render() call per frame.
+ *
+ * Frame-loop contract (see README):
+ *   priority 0  — Asset3D writes livePoseRegistry (default useFrame)
+ *   priority 1  — FocusedCameraController reads registry, adjusts camera
+ *   priority 2  — RenderRoot: renders scene
+ *
+ * Rule: any useFrame with priority > 0 disables R3F auto-render, so *exactly*
+ * one component in the tree must call gl.render at the highest priority. This
+ * is that component. Do not add useFrame(..., n) with n >= 2.
+ */
+function RenderRoot() {
+  const { gl, scene, camera } = useThree();
+  useFrame(() => gl.render(scene, camera), 2);
+  return null;
+}
+
+/** Thin wrapper so the hook can live inside <Canvas>. */
+function FocusController({ controlsRef }: { controlsRef: React.RefObject<OrbitControlsImpl | null> }) {
+  useFocusController({ controlsRef });
   return null;
 }
 
@@ -59,9 +85,11 @@ function KeyboardShortcuts() {
 
 export function Scene() {
   const siteData = useDatasetStore(s => s.siteData);
-  const mode     = useUiStore(s => s.mode);
+  const mode = useUiStore(s => s.mode);
+  const focusedAssetId = useUiStore(s => s.focusedAssetId);
   const assets = siteData.assets;
   const siteSize = siteData.site.sizeMeters;
+  const controlsRef = useRef<OrbitControlsImpl>(null);
 
   const showTrails  = mode === 'trails' || mode === 'both';
   const showHeatmap = mode === 'heatmap' || mode === 'both';
@@ -116,8 +144,14 @@ export function Scene() {
         ))}
       </Suspense>
 
-      {/* Camera */}
+      <FocusController controlsRef={controlsRef} />
+      <RenderRoot />
+
+      {/* Camera — disabled while an asset is focused so FocusedCameraController
+          has sole control; re-enabled on release from the focused asset's orbit position */}
       <OrbitControls
+        ref={controlsRef}
+        enabled={!focusedAssetId}
         target={[0, 0, 0]}
         minDistance={30}
         maxDistance={siteSize * 5}

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { Asset, AssetState } from '../types';
 import { interpolatePose } from '../utils/interpolate';
 import { useClockStore } from '../stores/clockStore';
+import { assetPositionRegistry } from '../utils/assetPositionRegistry';
 
 const MODEL_PATHS: Record<string, string> = {
   car_06:     '/models/Car_06.glb',
@@ -49,8 +50,6 @@ export function Asset3D({ asset, showLabel }: Asset3DProps) {
   const bobRef = useRef(Math.random() * Math.PI * 2); // phase offset
   const wheelRotRef = useRef(0);
   const lastEmissiveState = useRef<AssetState | null>(null);
-  // Cached pose written by useFrame; render body reads it to avoid a second binary search
-  const poseRef = useRef<ReturnType<typeof interpolatePose>>(null);
 
   // Collect all meshes for emissive updates
   useEffect(() => {
@@ -59,16 +58,19 @@ export function Asset3D({ asset, showLabel }: Asset3DProps) {
     meshesRef.current = meshes;
   }, [clone]);
 
+  // Remove from position registry when unmounted
+  useEffect(() => () => assetPositionRegistry.remove(asset.id), [asset.id]);
+
   useFrame((_state, delta) => {
     const group = groupRef.current;
     if (!group) return;
 
     const pose = interpolatePose(asset.snapshots, t);
-    poseRef.current = pose;
     if (!pose) { group.visible = false; return; }
 
     group.visible = true;
     group.position.set(pose.x, 0, pose.z);
+    assetPositionRegistry.set(asset.id, pose.x, pose.z);
 
     // Smooth heading rotation (shortest path)
     const targetY = -THREE.MathUtils.degToRad(pose.heading);
@@ -104,11 +106,10 @@ export function Asset3D({ asset, showLabel }: Asset3DProps) {
     }
   });
 
-  // Render body reads poseRef written by the previous frame — avoids a second binary search
-  const isOnSite = poseRef.current !== null;
-
-  if (!isOnSite) return null;
-  const pose = poseRef.current!;
+  // Compute pose for render (needed for mount + label state). O(log n) binary search —
+  // negligible; don't gate rendering on a useFrame-written ref (creates mount deadlock).
+  const pose = interpolatePose(asset.snapshots, t);
+  if (!pose) return null;
 
   return (
     <group ref={groupRef}>

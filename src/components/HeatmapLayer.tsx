@@ -14,7 +14,8 @@ interface HeatmapLayerProps {
 }
 
 export function HeatmapLayer({ assets }: HeatmapLayerProps) {
-  const t        = useClockStore(s => s.t);
+  // Don't subscribe to t — useFrame reads fresh state every frame. Subscribing
+  // would force a React re-render every frame for no value.
   const siteSize = useDatasetStore(s => s.siteData.site.sizeMeters);
   const lastPaintedT = useRef(-1); // -1 so first startStep = 0; avoids -Infinity loop
 
@@ -35,6 +36,8 @@ export function HeatmapLayer({ assets }: HeatmapLayerProps) {
 
   useFrame(() => {
     if (!matRef.current) return;
+
+    const t = useClockStore.getState().t;
 
     // If scrubbed backward, reset and repaint from zero
     if (t < lastPaintedT.current - INTERVAL) {
