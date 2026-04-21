@@ -3,10 +3,10 @@ import { PlaybackControls } from './components/PlaybackControls';
 import { EventToastContainer } from './components/EventToast';
 import { AssetList } from './components/AssetList';
 import { DatasetSwitcher } from './components/DatasetSwitcher';
-import { usePlayback } from './stores/playbackStore';
+import { useDatasetStore } from './stores/datasetStore';
 
 function TopBar() {
-  const { siteData } = usePlayback();
+  const siteData = useDatasetStore(s => s.siteData);
   const { name } = siteData.site;
   const { start, end } = siteData.timeRange;
   const fmt = (iso: string) =>

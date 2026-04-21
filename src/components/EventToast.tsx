@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { usePlayback } from '../stores/playbackStore';
+import { useUiStore } from '../stores/uiStore';
 import type { SiteEvent } from '../types';
 
 const TOAST_DURATION_MS = 5000;
 
 function Toast({ event }: { event: SiteEvent }) {
-  const { dismissToast } = usePlayback();
+  const dismissToast = useUiStore(s => s.dismissToast);
   const isArrive = event.type === 'arrive';
 
   // Auto-dismiss after TOAST_DURATION_MS
@@ -56,7 +56,7 @@ function Toast({ event }: { event: SiteEvent }) {
 }
 
 export function EventToastContainer() {
-  const { activeToasts } = usePlayback();
+  const activeToasts = useUiStore(s => s.activeToasts);
 
   return (
     <div className="fixed right-4 bottom-24 flex flex-col gap-2 z-20 pointer-events-none">

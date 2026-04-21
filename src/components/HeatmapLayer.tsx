@@ -2,7 +2,8 @@ import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Asset } from '../types';
-import { usePlayback } from '../stores/playbackStore';
+import { useClockStore } from '../stores/clockStore';
+import { useDatasetStore } from '../stores/datasetStore';
 import { HeatmapCanvas } from '../utils/heatmapCanvas';
 import { interpolatePose } from '../utils/interpolate';
 
@@ -13,8 +14,8 @@ interface HeatmapLayerProps {
 }
 
 export function HeatmapLayer({ assets }: HeatmapLayerProps) {
-  const { t, siteData } = usePlayback();
-  const siteSize = siteData.site.sizeMeters;
+  const t        = useClockStore(s => s.t);
+  const siteSize = useDatasetStore(s => s.siteData.site.sizeMeters);
   const lastPaintedT = useRef(-1); // -1 so first startStep = 0; avoids -Infinity loop
 
   const { heatmap, texture } = useMemo(() => {

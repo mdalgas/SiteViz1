@@ -4,7 +4,7 @@ import { useGLTF, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Asset, AssetState } from '../types';
 import { interpolatePose } from '../utils/interpolate';
-import { usePlayback } from '../stores/playbackStore';
+import { useClockStore } from '../stores/clockStore';
 
 const MODEL_PATHS: Record<string, string> = {
   car_06:     '/models/Car_06.glb',
@@ -30,7 +30,7 @@ interface Asset3DProps {
 }
 
 export function Asset3D({ asset, showLabel }: Asset3DProps) {
-  const { t } = usePlayback();
+  const t = useClockStore(s => s.t);
   const path = MODEL_PATHS[asset.modelKey] ?? MODEL_PATHS['car_06'];
   const { scene } = useGLTF(path);
 

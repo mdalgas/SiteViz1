@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { usePlayback } from '../stores/playbackStore';
+import { useDatasetStore } from '../stores/datasetStore';
+import { useClockStore } from '../stores/clockStore';
 import { interpolatePose } from '../utils/interpolate';
 import { computeAssetStats, formatDuration } from '../utils/assetStats';
 import type { Asset, AssetState } from '../types';
@@ -29,7 +30,8 @@ function splitLabel(label: string): { name: string; assetType: string | null } {
 // ─── Container ────────────────────────────────────────────────────────────────
 
 export function AssetList() {
-  const { siteData, t } = usePlayback();
+  const siteData = useDatasetStore(s => s.siteData);
+  const t        = useClockStore(s => s.t);
   const bucket = Math.floor(t / 120); // throttle: recompute stats once per 120s slot
 
   return (

@@ -1,4 +1,7 @@
-import { usePlayback } from '../stores/playbackStore';
+import { useClockStore } from '../stores/clockStore';
+import { useDatasetStore } from '../stores/datasetStore';
+import { useUiStore } from '../stores/uiStore';
+import { resetPlayback } from '../stores/playbackTick';
 import type { VisualizationMode } from '../types';
 
 const SPEEDS = [60, 300, 1000, 3000, 9000];
@@ -15,7 +18,16 @@ function formatTime(seconds: number, startISO: string, durationSeconds: number):
 }
 
 export function PlaybackControls() {
-  const { t, playing, speed, duration, mode, siteData, setT, setPlaying, setSpeed, setMode, reset } = usePlayback();
+  const t          = useClockStore(s => s.t);
+  const playing    = useClockStore(s => s.playing);
+  const speed      = useClockStore(s => s.speed);
+  const duration   = useClockStore(s => s.duration);
+  const setT       = useClockStore(s => s.setT);
+  const setPlaying = useClockStore(s => s.setPlaying);
+  const setSpeed   = useClockStore(s => s.setSpeed);
+  const mode       = useUiStore(s => s.mode);
+  const setMode    = useUiStore(s => s.setMode);
+  const siteData   = useDatasetStore(s => s.siteData);
   const progress = t / duration;
   const startISO = siteData.timeRange.start;
 
@@ -69,7 +81,7 @@ export function PlaybackControls() {
         {/* Transport */}
         <div className="flex items-center gap-2">
           <button
-            onClick={reset}
+            onClick={resetPlayback}
             className="text-gray-400 hover:text-white transition-colors text-lg w-7 h-7 flex items-center justify-center"
             title="Reset"
           >

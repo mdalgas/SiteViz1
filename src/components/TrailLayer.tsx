@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Asset } from '../types';
-import { usePlayback } from '../stores/playbackStore';
+import { useClockStore } from '../stores/clockStore';
 import { trailPointsUpTo } from '../utils/interpolate';
 
 interface TrailLayerProps {
@@ -10,7 +10,7 @@ interface TrailLayerProps {
 }
 
 export function TrailLayer({ assets }: TrailLayerProps) {
-  const { t } = usePlayback();
+  const t = useClockStore(s => s.t);
 
   return (
     <>

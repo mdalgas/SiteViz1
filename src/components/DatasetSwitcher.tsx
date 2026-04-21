@@ -1,4 +1,4 @@
-import { usePlayback } from '../stores/playbackStore';
+import { useDatasetStore } from '../stores/datasetStore';
 
 const DATASETS = [
   { file: 'titan-export.json',     label: 'Titan',     sub: 'Aalborg · 9 days · 4 assets' },
@@ -7,7 +7,9 @@ const DATASETS = [
 ];
 
 export function DatasetSwitcher() {
-  const { currentDataset, loadingDataset, loadDataset } = usePlayback();
+  const currentDataset  = useDatasetStore(s => s.currentDataset);
+  const loadingDataset  = useDatasetStore(s => s.loadingDataset);
+  const loadDataset     = useDatasetStore(s => s.loadDataset);
 
   return (
     <div

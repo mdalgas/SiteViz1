@@ -7,22 +7,20 @@ import { SiteBoundary } from './SiteBoundary';
 import { Asset3D } from './Asset3D';
 import { TrailLayer } from './TrailLayer';
 import { HeatmapLayer } from './HeatmapLayer';
-import { usePlayback } from '../stores/playbackStore';
+import { useClockStore } from '../stores/clockStore';
+import { useDatasetStore } from '../stores/datasetStore';
+import { useUiStore } from '../stores/uiStore';
+import { tickPlayback, resetPlayback } from '../stores/playbackTick';
 
 /** Drives the playback clock inside the Canvas RAF */
 function PlaybackClock() {
-  const { playing, tick } = usePlayback();
-
-  useFrame((_, delta) => {
-    if (playing) tick(delta);
-  });
-
+  useFrame((_, delta) => tickPlayback(delta));
   return null;
 }
 
 /** Repositions camera when siteData changes */
 function CameraRig() {
-  const siteSize = usePlayback(s => s.siteData.site.sizeMeters);
+  const siteSize = useDatasetStore(s => s.siteData.site.sizeMeters);
   const { camera } = useThree();
 
   useEffect(() => {
@@ -39,25 +37,29 @@ function CameraRig() {
 
 /** Keyboard shortcuts */
 function KeyboardShortcuts() {
-  const { playing, setPlaying, reset, setSpeed, speed } = usePlayback();
+  const playing    = useClockStore(s => s.playing);
+  const speed      = useClockStore(s => s.speed);
+  const setPlaying = useClockStore(s => s.setPlaying);
+  const setSpeed   = useClockStore(s => s.setSpeed);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
       if (e.code === 'Space') { e.preventDefault(); setPlaying(!playing); }
-      if (e.code === 'KeyR') reset();
+      if (e.code === 'KeyR') resetPlayback();
       if (e.code === 'BracketRight') setSpeed(Math.min(speed * 3, 9000));
       if (e.code === 'BracketLeft')  setSpeed(Math.max(speed / 3, 60));
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [playing, speed, setPlaying, reset, setSpeed]);
+  }, [playing, speed, setPlaying, setSpeed]);
 
   return null;
 }
 
 export function Scene() {
-  const { siteData, mode } = usePlayback();
+  const siteData = useDatasetStore(s => s.siteData);
+  const mode     = useUiStore(s => s.mode);
   const assets = siteData.assets;
   const siteSize = siteData.site.sizeMeters;
 

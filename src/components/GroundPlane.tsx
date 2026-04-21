@@ -1,7 +1,7 @@
-import { usePlayback } from '../stores/playbackStore';
+import { useDatasetStore } from '../stores/datasetStore';
 
 export function GroundPlane() {
-  const siteSize = usePlayback(s => s.siteData.site.sizeMeters);
+  const siteSize = useDatasetStore(s => s.siteData.site.sizeMeters);
   const gridDivisions = Math.min(32, Math.max(8, Math.round(siteSize / 20)));
 
   return (

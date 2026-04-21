@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { usePlayback } from '../stores/playbackStore';
+import { useDatasetStore } from '../stores/datasetStore';
 
 export function SiteBoundary() {
-  const siteSize = usePlayback(s => s.siteData.site.sizeMeters);
+  const siteSize = useDatasetStore(s => s.siteData.site.sizeMeters);
   const half = siteSize / 2;
   const H = Math.max(2.5, siteSize * 0.006); // fence height scales slightly with site
 
